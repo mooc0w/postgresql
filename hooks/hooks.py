@@ -844,9 +844,10 @@ def install(run_pre=True):
 
         # Drop the cluster created when the postgresql package was
         # installed, and rebuild it with the requested locale and encoding.
-        run("pg_dropcluster --stop 9.1 main")
-        run("pg_createcluster --locale='{}' --encoding='{}' 9.1 main".format(
-            config_data['locale'], config_data['encoding']))
+        run("pg_dropcluster --stop {} main".format(
+            config_data['version']))
+        run("pg_createcluster --locale='{}' --encoding='{}' {} main".format(
+            config_data['locale'], config_data['encoding'], config_data['version']))
 
     host.mkdir(postgresql_backups_dir, owner="postgres", perms=0o755)
     host.mkdir(postgresql_scripts_dir, owner="postgres", perms=0o755)
@@ -1256,13 +1257,19 @@ def update_repos_and_packages():
             fetch.apt_update(fatal=True)
             local_state.save()
 
+    with open('/etc/apt/sources.list.d/pgdg.list', 'w') as target:
+        target.write("deb http://apt.postgresql.org/pub/repos/apt/ precise-pgdg main\n")
+    run('apt-key adv --keyserver keyserver.ubuntu.com --recv-keys B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8')
+
+    fetch.apt_update(fatal=True)
+    local_state.save()
+
     # It might have been better for debversion and plpython to only get
     # installed if they were listed in the extra-packages config item,
     # but they predate this feature.
     packages = ["postgresql-%s" % config_data["version"],
                 "postgresql-contrib-%s" % config_data["version"],
                 "postgresql-plpython-%s" % config_data["version"],
-                "postgresql-%s-debversion" % config_data["version"],
                 "python-jinja2", "syslinux", "python-psycopg2"]
     packages.extend((hookenv.config('extra-packages') or '').split())
     packages = fetch.filter_installed_packages(packages)
